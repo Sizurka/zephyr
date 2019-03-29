@@ -10,6 +10,7 @@
 #include <init.h>
 #include <soc.h>
 #include <i2c.h>
+#include <dma.h>
 
 #define LOG_LEVEL CONFIG_I2C_LOG_LEVEL
 #include <logging/log.h>
@@ -24,6 +25,12 @@ struct i2c_sam0_dev_config {
 	u16_t gclk_clkctrl_id;
 
 	void (*irq_config_func)(struct device *dev);
+
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+	u8_t write_dma_request;
+	u8_t read_dma_request;
+	u8_t dma_channel;
+#endif
 };
 
 struct i2c_sam0_msg {
@@ -35,6 +42,10 @@ struct i2c_sam0_msg {
 struct i2c_sam0_dev_data {
 	struct k_sem sem;
 	struct i2c_sam0_msg msg;
+
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+	struct device *dma;
+#endif
 };
 
 #define DEV_NAME(dev) ((dev)->config->name)
@@ -79,6 +90,12 @@ static bool i2c_sam0_terminate_on_error(struct device *dev)
 			SERCOM_I2CM_STATUS_BUSERR))) {
 		return false;
 	}
+
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+	if (data->dma && cfg->dma_channel != 0xFF) {
+		dma_stop(data->dma, cfg->dma_channel);
+	}
+#endif
 
 	data->msg.status = i2c->STATUS.reg;
 
@@ -152,6 +169,194 @@ static void i2c_sam0_isr(void *arg)
 	}
 }
 
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+
+static void i2c_sam0_dma_write_done(void *arg, u32_t id, int error_code)
+{
+	struct device *dev = arg;
+	struct i2c_sam0_dev_data *data = DEV_DATA(dev);
+	const struct i2c_sam0_dev_config *const cfg = DEV_CFG(dev);
+	SercomI2cm *i2c = cfg->regs;
+
+	ARG_UNUSED(id);
+
+	int key = irq_lock();
+
+	if (i2c_sam0_terminate_on_error(dev)) {
+		irq_unlock(key);
+		return;
+	}
+
+	if (error_code < 0) {
+		LOG_ERR("DMA write error on %s: %d", DEV_NAME(dev), error_code);
+		i2c->INTENCLR.reg = SERCOM_I2CM_INTENCLR_MASK;
+		irq_unlock(key);
+
+		data->msg.status = error_code;
+
+		k_sem_give(&data->sem);
+		return;
+	}
+
+	irq_unlock(key);
+
+	/*
+	 * DMA has written the whole message now, so just wait for the
+	 * final I2C IRQ to indicate that it's finished transmitting.
+	 */
+	data->msg.size = 0;
+	i2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB;
+}
+
+static bool i2c_sam0_dma_write_start(struct device *dev)
+{
+	struct i2c_sam0_dev_data *data = DEV_DATA(dev);
+	const struct i2c_sam0_dev_config *const cfg = DEV_CFG(dev);
+	SercomI2cm *i2c = cfg->regs;
+	int retval;
+
+	if (!data->dma) {
+		return false;
+	}
+	if (cfg->dma_channel == 0xFF) {
+		return false;
+	}
+	if (data->msg.size <= 1) {
+		/*
+		 * Catch empty writes and skip DMA on single byte transfers.
+		 */
+		return false;
+	}
+
+	struct dma_config dma_cfg = {0};
+	struct dma_block_config dma_blk = {0};
+
+	dma_cfg.channel_direction = MEMORY_TO_PERIPHERAL;
+	dma_cfg.source_data_size = 1;
+	dma_cfg.dest_data_size = 1;
+	dma_cfg.callback_arg = dev;
+	dma_cfg.dma_callback = i2c_sam0_dma_write_done;
+	dma_cfg.block_count = 1;
+	dma_cfg.head_block = &dma_blk;
+	dma_cfg.dma_slot = cfg->write_dma_request;
+
+	dma_blk.block_size = data->msg.size;
+	dma_blk.source_address = (u32_t)data->msg.buffer;
+	dma_blk.dest_address = (u32_t)(&(i2c->DATA.reg));
+	dma_blk.dest_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+
+	retval = dma_config(data->dma, cfg->dma_channel, &dma_cfg);
+	if (retval != 0) {
+		LOG_ERR("Write DMA configure on %s failed: %d",
+				DEV_NAME(dev), retval);
+		return false;
+	}
+
+	retval = dma_start(data->dma, cfg->dma_channel);
+	if (retval != 0) {
+		LOG_ERR("Write DMA start on %s failed: %d",
+				DEV_NAME(dev), retval);
+		return false;
+	}
+
+	return true;
+}
+
+static void i2c_sam0_dma_read_done(void *arg, u32_t id, int error_code)
+{
+	struct device *dev = arg;
+	struct i2c_sam0_dev_data *data = DEV_DATA(dev);
+	const struct i2c_sam0_dev_config *const cfg = DEV_CFG(dev);
+	SercomI2cm *i2c = cfg->regs;
+
+	ARG_UNUSED(id);
+
+	int key = irq_lock();
+
+	if (i2c_sam0_terminate_on_error(dev)) {
+		irq_unlock(key);
+		return;
+	}
+
+	if (error_code < 0) {
+		LOG_ERR("DMA read error on %s: %d", DEV_NAME(dev), error_code);
+		i2c->INTENCLR.reg = SERCOM_I2CM_INTENCLR_MASK;
+		irq_unlock(key);
+
+		data->msg.status = error_code;
+
+		k_sem_give(&data->sem);
+		return;
+	}
+
+	irq_unlock(key);
+
+	/*
+	 * DMA has read all but the last byte now, so let the ISR handle
+	 * that and the terminating NACK.
+	 */
+	data->msg.buffer += data->msg.size - 1;
+	data->msg.size = 1;
+	i2c->INTENSET.reg = SERCOM_I2CM_INTENSET_SB;
+}
+
+static bool i2c_sam0_dma_read_start(struct device *dev)
+{
+	struct i2c_sam0_dev_data *data = DEV_DATA(dev);
+	const struct i2c_sam0_dev_config *const cfg = DEV_CFG(dev);
+	SercomI2cm *i2c = cfg->regs;
+	int retval;
+
+	if (!data->dma) {
+		return false;
+	}
+	if (cfg->dma_channel == 0xFF) {
+		return false;
+	}
+	if (data->msg.size <= 2) {
+		/*
+		 * The last byte is always handled by the I2C ISR so
+		 * just skip a two length read as well.
+		 */
+		return false;
+	}
+
+	struct dma_config dma_cfg = {0};
+	struct dma_block_config dma_blk = {0};
+
+	dma_cfg.channel_direction = PERIPHERAL_TO_MEMORY;
+	dma_cfg.source_data_size = 1;
+	dma_cfg.dest_data_size = 1;
+	dma_cfg.callback_arg = dev;
+	dma_cfg.dma_callback = i2c_sam0_dma_read_done;
+	dma_cfg.block_count = 1;
+	dma_cfg.head_block = &dma_blk;
+	dma_cfg.dma_slot = cfg->read_dma_request;
+
+	dma_blk.block_size = data->msg.size - 1;
+	dma_blk.dest_address = (u32_t)data->msg.buffer;
+	dma_blk.source_address = (u32_t)(&(i2c->DATA.reg));
+	dma_blk.source_addr_adj = DMA_ADDR_ADJ_NO_CHANGE;
+
+	retval = dma_config(data->dma, cfg->dma_channel, &dma_cfg);
+	if (retval != 0) {
+		LOG_ERR("Read DMA configure on %s failed: %d",
+				DEV_NAME(dev), retval);
+		return false;
+	}
+
+	retval = dma_start(data->dma, cfg->dma_channel);
+	if (retval != 0) {
+		LOG_ERR("Read DMA start on %s failed: %d",
+				DEV_NAME(dev), retval);
+		return false;
+	}
+
+	return true;
+}
+
+#endif
+
 static int i2c_sam0_transfer(struct device *dev, struct i2c_msg *msgs,
 			     u8_t num_msgs, u16_t addr)
 {
@@ -193,16 +398,7 @@ static int i2c_sam0_transfer(struct device *dev, struct i2c_msg *msgs,
 			/* Set to auto ACK */
 			i2c->CTRLB.bit.ACKACT = 0;
 			wait_synchronization(i2c);
-
-			i2c->INTENSET.reg = SERCOM_I2CM_INTENSET_SB;
 		}
-
-		/* Always set MB, since that's how some errors are indicated */
-		i2c->INTENSET.reg =
-#ifdef SERCOM_I2CM_INTENSET_ERROR
-				SERCOM_I2CM_INTENSET_ERROR |
-#endif
-				SERCOM_I2CM_INTENSET_MB;
 
 		if (msgs->flags & I2C_MSG_ADDR_10_BITS) {
 #ifdef SERCOM_I2CM_ADDR_TENBITEN
@@ -212,12 +408,49 @@ static int i2c_sam0_transfer(struct device *dev, struct i2c_msg *msgs,
 #endif
 		}
 
+		int key = irq_lock();
+
 		/*
 		 * Writing the address starts the transaction, issuing
-		 * a start/repeated start as required
+		 * a start/repeated start as required.
 		 */
 		i2c->ADDR.reg = addr_reg;
+
+		/*
+		 * Have to wait here to make sure the address write
+		 * clears any pending requests or errors before DMA or
+		 * ISRs try and handle it.
+		 */
 		wait_synchronization(i2c);
+
+#ifdef SERCOM_I2CM_INTENSET_ERROR
+		i2c->INTENSET.reg = SERCOM_I2CM_INTENSET_ERROR;
+#endif
+
+		if ((msgs->flags & I2C_MSG_RW_MASK) == I2C_MSG_READ) {
+			/*
+			 * Always set MB, since that's how some errors are
+			 * indicated
+			 */
+			i2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB;
+
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+			if (!i2c_sam0_dma_read_start(dev))
+#endif
+			{
+				i2c->INTENSET.reg = SERCOM_I2CM_INTENSET_SB;
+			}
+
+		} else {
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+			if (!i2c_sam0_dma_write_start(dev))
+#endif
+			{
+				i2c->INTENSET.reg = SERCOM_I2CM_INTENSET_MB;
+			}
+		}
+
+		irq_unlock(key);
 
 		/* Now wait for the ISR to handle everything */
 		k_sem_take(&data->sem, K_FOREVER);
@@ -451,6 +684,12 @@ static int i2c_sam0_initialize(struct device *dev)
 
 	cfg->irq_config_func(dev);
 
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+
+	data->dma = device_get_binding(CONFIG_DMA_0_NAME);
+
+#endif
+
 	i2c->CTRLA.bit.ENABLE = 1;
 	wait_synchronization(i2c);
 
@@ -467,6 +706,48 @@ static const struct i2c_driver_api i2c_sam0_driver_api = {
 	.transfer = i2c_sam0_transfer,
 };
 
+#ifdef CONFIG_I2C_SAM0_DMA_DRIVEN
+#if !(DT_I2C_SAM0_SERCOM0_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM0_DMA))
+#undef DT_I2C_SAM0_SERCOM0_DMA
+#define DT_I2C_SAM0_SERCOM0_DMA 0xFF
+#endif
+#if !(DT_I2C_SAM0_SERCOM1_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM1_DMA))
+#undef DT_I2C_SAM0_SERCOM1_DMA
+#define DT_I2C_SAM0_SERCOM1_DMA 0xFF
+#endif
+#if !(DT_I2C_SAM0_SERCOM2_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM2_DMA))
+#undef DT_I2C_SAM0_SERCOM2_DMA
+#define DT_I2C_SAM0_SERCOM2_DMA 0xFF
+#endif
+#if !(DT_I2C_SAM0_SERCOM3_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM3_DMA))
+#undef DT_I2C_SAM0_SERCOM3_DMA
+#define DT_I2C_SAM0_SERCOM3_DMA 0xFF
+#endif
+#if !(DT_I2C_SAM0_SERCOM4_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM4_DMA))
+#undef DT_I2C_SAM0_SERCOM4_DMA
+#define DT_I2C_SAM0_SERCOM4_DMA 0xFF
+#endif
+#if !(DT_I2C_SAM0_SERCOM5_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM5_DMA))
+#undef DT_I2C_SAM0_SERCOM5_DMA
+#define DT_I2C_SAM0_SERCOM5_DMA 0xFF
+#endif
+#if !(DT_I2C_SAM0_SERCOM6_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM6_DMA))
+#undef DT_I2C_SAM0_SERCOM6_DMA
+#define DT_I2C_SAM0_SERCOM6_DMA 0xFF
+#endif
+#if !(DT_I2C_SAM0_SERCOM7_DMA || UTIL_NOT(DT_I2C_SAM0_SERCOM7_DMA))
+#undef DT_I2C_SAM0_SERCOM7_DMA
+#define DT_I2C_SAM0_SERCOM7_DMA 0xFF
+#endif
+
+#define I2C_SAM0_DMA_CHANNELS(n)					      \
+	.write_dma_request = SERCOM##n##_DMAC_ID_TX,			      \
+	.read_dma_request = SERCOM##n##_DMAC_ID_RX,			      \
+	.dma_channel = DT_I2C_SAM0_SERCOM##n##_DMA,
+#else
+#define I2C_SAM0_DMA_CHANNELS(n)
+#endif
+
 #define I2C_SAM0_DEVICE(n)						      \
 	static void i2c_sam_irq_config_##n(struct device *dev);		      \
 	static const struct i2c_sam0_dev_config i2c_sam0_dev_config_##n = {   \
@@ -474,7 +755,8 @@ static const struct i2c_driver_api i2c_sam0_driver_api = {
 		.bitrate = DT_I2C_SAM0_SERCOM##n##_CLOCK_FREQUENCY,	      \
 		.pm_apbcmask = PM_APBCMASK_SERCOM##n,			      \
 		.gclk_clkctrl_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE,	      \
-		.irq_config_func = &i2c_sam_irq_config_##n		      \
+		.irq_config_func = &i2c_sam_irq_config_##n,		      \
+		I2C_SAM0_DMA_CHANNELS(n)				      \
 	};								      \
 	static struct i2c_sam0_dev_data i2c_sam0_dev_data_##n;		      \
 	DEVICE_AND_API_INIT(i2c_sam0_##n,				      \

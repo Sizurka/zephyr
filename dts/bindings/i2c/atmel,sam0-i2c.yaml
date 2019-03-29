@@ -31,4 +31,10 @@ properties:
       category: required
       description: required interrupts
       generation: define
+
+    dma:
+      type: int
+      category: optional
+      description: DMA channel
+      generation: define
 ...
