@@ -153,6 +153,41 @@ class DTClocks(DTDirective):
                             clock_label,
                             prop_alias)
 
+                for prop_name, prop_binding in clock_provider_bindings[
+                        'properties'].items():
+                    try:
+                        generation = prop_binding['generation']
+                    except:
+                        generation = ''
+                    if 'consumer' not in generation:
+                        continue
+                    provider_value = clock_provider['props'].get(prop_name)
+                    if provider_value is None:
+                        continue
+
+                    consumer_prop = self.get_label_string([
+                        clock_consumer_label, clock_cells_string,
+                        str(clock_index), prop_name])
+                    prop_def[consumer_prop] = str(provider_value)
+
+                    add_compat_alias(node_path,
+                                     self.get_label_string(["",
+                                                            clock_cells_string,
+                                                            str(clock_index),
+                                                            prop_name]),
+                                     consumer_prop, prop_alias)
+                    if node_path in aliases:
+                        add_prop_aliases(
+                            node_path,
+                            lambda alias:
+                                self.get_label_string([
+                                    alias,
+                                    clock_cells_string,
+                                    str(clock_index),
+                                    prop_name]),
+                            consumer_prop,
+                            prop_alias)
+
                 insert_defs(node_path, prop_def, prop_alias)
 
                 clock_cell_index = 0
