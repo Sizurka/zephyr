@@ -29,7 +29,7 @@ static void flash_waitstates_init(void)
 
 static void xosc_init(void)
 {
-#ifdef CONFIG_SOC_ATMEL_SAMD_XOSC
+#if DT_FIXED_CLOCK_XOSC_CLOCK_FREQUENCY
 #error External oscillator support is not implemented.
 #endif
 }
@@ -42,7 +42,7 @@ static void wait_gclk_synchronization(void)
 
 static void xosc32k_init(void)
 {
-#ifdef CONFIG_SOC_ATMEL_SAMD_XOSC32K
+#if DT_FIXED_CLOCK_XOSC32K_CLOCK_FREQUENCY
 	SYSCTRL->XOSC32K.reg = SYSCTRL_XOSC32K_STARTUP(6) |
 			       SYSCTRL_XOSC32K_XTALEN | SYSCTRL_XOSC32K_EN32K;
 
@@ -74,11 +74,11 @@ static void dfll_init(void)
 	wait_gclk_synchronization();
 
 
-#if defined(CONFIG_SOC_ATMEL_SAMD_XOSC32K_AS_MAIN)
+#if DT_FIXED_CLOCK_XOSC32K_CLOCK_FREQUENCY && DT_ATMEL_SAM0_DFLL_0_CLOCK_0_CLOCK_FREQUENCY == 32768
 	/* Route XOSC32K to GCLK1 */
 	GCLK->GENCTRL.reg =
 	    GCLK_GENCTRL_ID(1) | GCLK_GENCTRL_SRC_XOSC32K | GCLK_GENCTRL_GENEN;
-#elif defined(CONFIG_SOC_ATMEL_SAMD_OSC8M_AS_MAIN)
+#elif DT_ATMEL_SAM0_DFLL_0_CLOCK_0_CLOCK_FREQUENCY == 8000000
 	/* Route OSC8M to GCLK1 */
 	GCLK->GENCTRL.reg =
 	    GCLK_GENCTRL_ID(1) | GCLK_GENCTRL_SRC_OSC8M | GCLK_GENCTRL_GENEN;
@@ -88,18 +88,17 @@ static void dfll_init(void)
 
 	wait_gclk_synchronization();
 
-	/* Route GCLK1 to multiplexer 1 */
-	GCLK->CLKCTRL.reg =
-	    GCLK_CLKCTRL_ID(0) | GCLK_CLKCTRL_GEN_GCLK1 | GCLK_CLKCTRL_CLKEN;
+	/* Route GCLK to multiplexer 1 */
+	SOC_ATMEL_SAM0_GCLK_SELECT(0, DT_ATMEL_SAM0_DFLL_0_CLOCK_0);
 	wait_gclk_synchronization();
 
 	SYSCTRL->DFLLCTRL.reg = SYSCTRL_DFLLCTRL_ENABLE;
 	while (!SYSCTRL->PCLKSR.bit.DFLLRDY) {
 	}
 
-	u32_t mul = (SOC_ATMEL_SAM0_MCK_FREQ_HZ +
-		     SOC_ATMEL_SAM0_GCLK1_FREQ_HZ / 2) /
-		    SOC_ATMEL_SAM0_GCLK1_FREQ_HZ;
+	u32_t mul = (DT_ATMEL_SAM0_GCLK_GCLK_0_CLOCK_FREQUENCY +
+			DT_ATMEL_SAM0_DFLL_0_CLOCK_0_CLOCK_FREQUENCY / 2) /
+			DT_ATMEL_SAM0_DFLL_0_CLOCK_0_CLOCK_FREQUENCY;
 
 	SYSCTRL->DFLLMUL.reg = SYSCTRL_DFLLMUL_CSTEP(31) |
 			       SYSCTRL_DFLLMUL_FSTEP(511) |

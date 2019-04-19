@@ -25,12 +25,103 @@
 		reg = <0x20000000 0x8000>;
 	};
 
+	oscillators {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		osc32k: osc32k@100 {
+			compatible = "fixed-clock";
+			reg = <0>;
+			clock-frequency = <32768>;
+			#clock-cells = <0>;
+		};
+
+		ulposc32k: ulposc32k@101 {
+			compatible = "fixed-clock";
+			reg = <1>;
+			clock-frequency = <32768>;
+			#clock-cells = <0>;
+		};
+
+		osc8m: osc8m@102 {
+			compatible = "fixed-clock";
+			reg = <2>;
+			clock-frequency = <8000000>;
+			#clock-cells = <0>;
+		};
+
+		xosc32k: xosc32k@103 {
+			compatible = "fixed-clock";
+			reg = <3>;
+			clock-frequency = <32768>;
+			#clock-cells = <0>;
+			status = "disabled";
+		};
+
+		xosc: xosc@104 {
+			compatible = "fixed-clock";
+			reg = <4>;
+			#clock-cells = <0>;
+			status = "disabled";
+		};
+
+		gclk0: gclk@200 {
+			compatible = "atmel,sam0-gclk";
+			reg = <0>;
+			clock-frequency = <48000000>;
+			clocks = <&dfll>;
+			#clock-cells = <0>;
+		};
+
+		gclk1: gclk@201 {
+			compatible = "atmel,sam0-gclk";
+			reg = <1>;
+			clock-frequency = <8000000>;
+			clocks = <&osc8m>;
+			#clock-cells = <0>;
+		};
+
+		gclk2: gclk@202 {
+			compatible = "atmel,sam0-gclk";
+			reg = <2>;
+			clock-frequency = <1024>;
+			clocks = <&ulposc32k>;
+			#clock-cells = <0>;
+		};
+
+		gclk3: gclk@203 {
+			compatible = "atmel,sam0-gclk";
+			reg = <3>;
+			clock-frequency = <8000000>;
+			clocks = <&osc8m>;
+			#clock-cells = <0>;
+		};
+
+		dfll: dfll@300 {
+			compatible = "atmel,sam0-dfll";
+			reg = <0>;
+			clock-frequency = <48000000>;
+			clocks = <&gclk1>;
+			#clock-cells = <0>;
+		};
+	};
+
 	id: device_id@0 {
 		compatible = "atmel,sam0-id";
 		reg =	<0x0080A00C 0x4>,
 			<0x0080A040 0x4>,
 			<0x0080A044 0x4>,
 			<0x0080A048 0x4>;
+	};
+
+	aliases {
+		xosc32k = &xosc32k;
+		xosc = &xosc;
+
+		gclk-0 = &gclk0;
+		gclk-1 = &gclk1;
+		gclk-2 = &gclk2;
+		gclk-3 = &gclk3;
 	};
 
 	soc {
@@ -68,6 +159,7 @@
 			reg = <0x40001000 9>;
 			interrupts = <2 0>;
 			label = "WATCHDOG_0";
+			clocks = <&gclk2>;
 		};
 
 		sercom0: sercom@42000800 {
@@ -75,6 +167,7 @@
 			reg = <0x42000800 0x40>;
 			status = "disabled";
 			label = "SERCOM0";
+			clocks = <&gclk0>;
 		};
 
 		sercom1: sercom@42000c00 {
@@ -82,6 +175,7 @@
 			reg = <0x42000c00 0x40>;
 			status = "disabled";
 			label = "SERCOM1";
+			clocks = <&gclk0>;
 		};
 
 		sercom2: sercom@42001000 {
@@ -89,6 +183,7 @@
 			reg = <0x42001000 0x40>;
 			status = "disabled";
 			label = "SERCOM2";
+			clocks = <&gclk0>;
 		};
 
 		sercom3: sercom@42001400 {
@@ -96,6 +191,7 @@
 			reg = <0x42001400 0x40>;
 			status = "disabled";
 			label = "SERCOM3";
+			clocks = <&gclk0>;
 		};
 
 		sercom4: sercom@42001800 {
@@ -103,6 +199,7 @@
 			reg = <0x42001800 0x40>;
 			status = "disabled";
 			label = "SERCOM4";
+			clocks = <&gclk0>;
 		};
 
 		sercom5: sercom@42001c00 {
@@ -110,6 +207,7 @@
 			reg = <0x42001c00 0x40>;
 			status = "disabled";
 			label = "SERCOM5";
+			clocks = <&gclk0>;
 		};
 
 		porta: gpio@41004400 {
@@ -135,6 +233,7 @@
 			clock-generator = <0>;
 			status = "disabled";
 			label = "RTC";
+			clocks = <&gclk0>;
 		};
 	};
 };

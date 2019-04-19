@@ -19,7 +19,7 @@ struct spi_sam0_config {
 	SercomSpi *regs;
 	u32_t pads;
 	u32_t pm_apbcmask;
-	u16_t gclk_clkctrl_id;
+	SOC_ATMEL_SAM0_GCLK_INSTANCE_CFG
 };
 
 /* Device run time data */
@@ -94,7 +94,7 @@ static int spi_sam0_configure(struct device *dev,
 	ctrlb.bit.CHSIZE = 0;
 
 	/* Use the requested or next higest possible frequency */
-	div = (SOC_ATMEL_SAM0_GCLK0_FREQ_HZ / config->frequency) / 2U - 1;
+	div = (cfg->clock_frequency / config->frequency) / 2U - 1;
 	div = MAX(0, MIN(UINT8_MAX, div));
 
 	/* Update the configuration only if it has changed */
@@ -439,8 +439,7 @@ static int spi_sam0_init(struct device *dev)
 	SercomSpi *regs = cfg->regs;
 
 	/* Enable the GCLK */
-	GCLK->CLKCTRL.reg = cfg->gclk_clkctrl_id | GCLK_CLKCTRL_GEN_GCLK0 |
-			    GCLK_CLKCTRL_CLKEN;
+	SOC_ATMEL_SAM0_GCLK_INSTANCE_SELECT(cfg);
 
 	/* Enable SERCOM clock in PM */
 	PM->APBCMASK.reg |= cfg->pm_apbcmask;
@@ -474,7 +473,8 @@ static const struct spi_driver_api spi_sam0_driver_api = {
 	static const struct spi_sam0_config spi_sam0_config_##n = {          \
 		.regs = (SercomSpi *)DT_SPI_SAM0_SERCOM##n##_BASE_ADDRESS, \
 		.pm_apbcmask = PM_APBCMASK_SERCOM##n,                        \
-		.gclk_clkctrl_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE,         \
+		SOC_ATMEL_SAM0_GCLK_INSTANCE_DEFN(GCLK_CLKCTRL_ID_SERCOM##n##_CORE,\
+			DT_SPI_SAM0_SERCOM##n##_CLOCK)			     \
 		.pads = SPI_SAM0_SERCOM_PADS(n)                       \
 	}
 

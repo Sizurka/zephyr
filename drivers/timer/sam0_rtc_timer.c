@@ -20,10 +20,10 @@
 #include <sys_clock.h>
 
 /* RTC registers. */
-#define RTC0 ((RtcMode0 *) DT_RTC_SAM0_BASE_ADDRESS)
+#define RTC0 ((RtcMode0 *) DT_ATMEL_SAM0_RTC_0_BASE_ADDRESS)
 
 /* Number of sys timer cycles per on tick. */
-#define CYCLES_PER_TICK (CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC \
+#define CYCLES_PER_TICK (DT_ATMEL_SAM0_RTC_0_CLOCK_0_CLOCK_FREQUENCY \
 			 / CONFIG_SYS_CLOCK_TICKS_PER_SEC)
 
 /* Maximum number of ticks. */
@@ -53,10 +53,6 @@ BUILD_ASSERT_MSG(CYCLES_PER_TICK > 1,
 		 "CYCLES_PER_TICK must be greater than 1 for ticking mode");
 
 #endif /* CONFIG_TICKLESS_KERNEL */
-
-/* Helper macro to get the correct GCLK GEN based on configuration. */
-#define GCLK_GEN(n) GCLK_EVAL(n)
-#define GCLK_EVAL(n) GCLK_CLKCTRL_GEN_GCLK##n
 
 /* Tick/cycle count of the last announce call. */
 static volatile u32_t rtc_last;
@@ -154,8 +150,8 @@ int z_clock_driver_init(struct device *device)
 
 	/* Set up bus clock and GCLK generator. */
 	PM->APBAMASK.reg |= PM_APBAMASK_RTC;
-	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_ID(RTC_GCLK_ID) | GCLK_CLKCTRL_CLKEN
-			    | GCLK_GEN(DT_RTC_SAM0_CLOCK_GENERATOR);
+	SOC_ATMEL_SAM0_GCLK_SELECT(GCLK_CLKCTRL_ID_RTC,
+			DT_ATMEL_SAM0_RTC_0_CLOCK_0);
 
 	while (GCLK->STATUS.bit.SYNCBUSY) {
 		/* Synchronize GCLK. */
@@ -191,9 +187,10 @@ int z_clock_driver_init(struct device *device)
 	RTC0->CTRL.reg |= RTC_MODE0_CTRL_ENABLE;
 
 	/* Enable RTC interrupt. */
-	NVIC_ClearPendingIRQ(DT_RTC_SAM0_IRQ);
-	IRQ_CONNECT(DT_RTC_SAM0_IRQ, DT_RTC_SAM0_IRQ_PRIORITY, rtc_isr, 0, 0);
-	irq_enable(DT_RTC_SAM0_IRQ);
+	NVIC_ClearPendingIRQ(DT_ATMEL_SAM0_RTC_0_IRQ_0);
+	IRQ_CONNECT(DT_ATMEL_SAM0_RTC_0_IRQ_0,
+			DT_ATMEL_SAM0_RTC_0_IRQ_0_PRIORITY, rtc_isr, 0, 0);
+	irq_enable(DT_ATMEL_SAM0_RTC_0_IRQ_0);
 
 	return 0;
 }

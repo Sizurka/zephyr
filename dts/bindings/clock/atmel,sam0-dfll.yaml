@@ -1,0 +1,28 @@
+#
+# Copyright (c) 2019 Derek Hageman <hageman@inthat.cloud>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+title: SAM0 Digital Frequency Locked Loop
+version: 0.1
+
+description: >
+    This is a representation of the SAM0 frequency locked loop
+
+inherits:
+    !include fixed-clock.yaml
+
+properties:
+    compatible:
+      type: string
+      category: required
+      description: compatible strings
+      constraint: "atmel,sam0-dfll"
+
+    clocks:
+      type: array
+      category: required
+      description: input clock source
+      generation: define
+...

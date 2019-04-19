@@ -1,0 +1,25 @@
+#
+# Copyright (c) 2019 Derek Hageman <hageman@inthat.cloud>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+title: Generic fixed frequency clock
+version: 0.1
+
+description: >
+    This is a representation of a generic clock at a fixed frequency
+
+properties:
+    compatible:
+      type: string
+      category: required
+      description: compatible strings
+      constraint: "fixed-clock"
+
+    clock-frequency:
+      type: int
+      description: output clock frequency (Hz)
+      generation: define, consumer
+      category: required
+...
