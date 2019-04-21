@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 ---
-title: SAM0 Generic Clock Generator
+title: SAM0 Fractional Digital Phase Locked Loop
 version: 0.1
 
 description: >
-    This is a representation of a SAM0 generic clock generator
+    This is a representation of the SAM0 phase locked loop
 
 inherits:
     !include atmel,sam0-clk-src.yaml
@@ -18,13 +18,7 @@ properties:
       type: string
       category: required
       description: compatible strings
-      constraint: "atmel,sam0-gclk"
-
-    reg:
-      type: int
-      category: required
-      description: generator index
-      generation: define, consumer
+      constraint: "atmel,sam0-fdpll"
 
     clocks:
       type: array

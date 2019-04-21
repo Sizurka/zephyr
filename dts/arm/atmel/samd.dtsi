@@ -30,38 +30,47 @@
 		#size-cells = <0>;
 
 		osc32k: osc32k@100 {
-			compatible = "fixed-clock";
+			compatible = "atmel,sam0-clk-src";
 			reg = <0>;
 			clock-frequency = <32768>;
+			gclk-src-id = <0x4>;
 			#clock-cells = <0>;
+			status = "disabled";
 		};
 
 		ulposc32k: ulposc32k@101 {
-			compatible = "fixed-clock";
+			compatible = "atmel,sam0-clk-src";
 			reg = <1>;
 			clock-frequency = <32768>;
+			gclk-src-id = <0x3>;
 			#clock-cells = <0>;
 		};
 
 		osc8m: osc8m@102 {
-			compatible = "fixed-clock";
+			compatible = "atmel,sam0-clk-src";
 			reg = <2>;
 			clock-frequency = <8000000>;
+			gclk-src-id = <0x6>;
 			#clock-cells = <0>;
 		};
 
 		xosc32k: xosc32k@103 {
-			compatible = "fixed-clock";
+			compatible = "atmel,sam0-clk-src";
 			reg = <3>;
 			clock-frequency = <32768>;
+			gclk-src-id = <0x5>;
+			fdpll-src-id = <0x0>;
 			#clock-cells = <0>;
 			status = "disabled";
 		};
 
 		xosc: xosc@104 {
-			compatible = "fixed-clock";
+			compatible = "atmel,sam0-clk-src";
 			reg = <4>;
 			#clock-cells = <0>;
+			clock-frequency = <2000000>;
+			gclk-src-id = <0x0>;
+			fdpll-src-id = <0x1>;
 			status = "disabled";
 		};
 
@@ -70,6 +79,7 @@
 			reg = <0>;
 			clock-frequency = <48000000>;
 			clocks = <&dfll>;
+			fdpll-src-id = <0x02>;
 			#clock-cells = <0>;
 		};
 
@@ -78,6 +88,7 @@
 			reg = <1>;
 			clock-frequency = <8000000>;
 			clocks = <&osc8m>;
+			fdpll-src-id = <0x2>;
 			#clock-cells = <0>;
 		};
 
@@ -86,6 +97,7 @@
 			reg = <2>;
 			clock-frequency = <1024>;
 			clocks = <&ulposc32k>;
+			fdpll-src-id = <0x2>;
 			#clock-cells = <0>;
 		};
 
@@ -94,13 +106,47 @@
 			reg = <3>;
 			clock-frequency = <8000000>;
 			clocks = <&osc8m>;
+			fdpll-src-id = <0x2>;
 			#clock-cells = <0>;
+		};
+
+		gclk4: gclk@204 {
+			compatible = "atmel,sam0-gclk";
+			reg = <4>;
+			fdpll-src-id = <0x2>;
+			#clock-cells = <0>;
+			status = "disabled";
+		};
+
+		gclk5: gclk@205 {
+			compatible = "atmel,sam0-gclk";
+			reg = <5>;
+			fdpll-src-id = <0x2>;
+			#clock-cells = <0>;
+			status = "disabled";
+		};
+
+		gclk6: gclk@206 {
+			compatible = "atmel,sam0-gclk";
+			reg = <6>;
+			fdpll-src-id = <0x2>;
+			#clock-cells = <0>;
+			status = "disabled";
+		};
+
+		gclk7: gclk@207 {
+			compatible = "atmel,sam0-gclk";
+			reg = <7>;
+			fdpll-src-id = <0x2>;
+			#clock-cells = <0>;
+			status = "disabled";
 		};
 
 		dfll: dfll@300 {
 			compatible = "atmel,sam0-dfll";
 			reg = <0>;
 			clock-frequency = <48000000>;
+			gclk-src-id = <0x7>;
 			clocks = <&gclk1>;
 			#clock-cells = <0>;
 		};
@@ -115,6 +161,8 @@
 	};
 
 	aliases {
+		osc8m = &osc8m;
+		osc32k = &osc32k;
 		xosc32k = &xosc32k;
 		xosc = &xosc;
 
@@ -122,6 +170,10 @@
 		gclk-1 = &gclk1;
 		gclk-2 = &gclk2;
 		gclk-3 = &gclk3;
+		gclk-4 = &gclk4;
+		gclk-5 = &gclk5;
+		gclk-6 = &gclk6;
+		gclk-7 = &gclk7;
 	};
 
 	soc {

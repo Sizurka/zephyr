@@ -7,6 +7,28 @@
 #include <atmel/samd.dtsi>
 
 / {
+	oscillators {
+		gclk8: gclk@208 {
+			compatible = "atmel,sam0-gclk";
+			reg = <8>;
+			fdpll-src-id = <0x2>;
+			#clock-cells = <0>;
+			status = "disabled";
+		};
+
+		fdpll: fdpll@400 {
+			compatible = "atmel,sam0-fdpll";
+			reg = <0>;
+			gclk-src-id = <0x8>;
+			#clock-cells = <0>;
+			status = "disabled";
+		};
+	};
+
+	aliases {
+		gclk-8 = &gclk8;
+	};
+
 	soc {
 		usb0: usb@41005000 {
 			compatible = "atmel,sam0-usb";

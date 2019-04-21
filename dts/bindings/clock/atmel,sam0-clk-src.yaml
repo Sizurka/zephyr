@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2019 Derek Hageman <hageman@inthat.cloud>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+title: SAM0 Generic Clock Input Source
+version: 0.1
+
+description: >
+    This is a representation an oscillator that can be used as a SAM0
+    clock input source
+
+inherits:
+    !include fixed-clock.yaml
+
+properties:
+    compatible:
+      type: string
+      category: required
+      description: compatible strings
+      constraint: "atmel,sam0-clk-src"
+
+    gclk-src-id:
+      type: int
+      category: optional
+      description: generic clock generator source identifier
+      generation: define, consumer
+
+    fdpll-src-id:
+      type: int
+      category: optional
+      description: generic clock generator source identifier
+      generation: define, consumer
+...

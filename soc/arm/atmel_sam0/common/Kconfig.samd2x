@@ -1,5 +1,0 @@
-# SPDX-License-Identifier: Apache-2.0
-
-if SOC_SERIES_SAMD20 || SOC_SERIES_SAMD21
-
-endif # SOC_SERIES_SAMD20 || SOC_SERIES_SAMD21

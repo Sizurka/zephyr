@@ -11,7 +11,7 @@ description: >
     This is a representation of the SAM0 frequency locked loop
 
 inherits:
-    !include fixed-clock.yaml
+    !include atmel,sam0-clk-src.yaml
 
 properties:
     compatible:
