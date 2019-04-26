@@ -10,6 +10,7 @@ LOG_MODULE_REGISTER(usb_dc_sam0);
 
 #include <usb/usb_device.h>
 #include <soc.h>
+#include <clock_control.h>
 #include <string.h>
 
 #define NVM_USB_PAD_TRANSN_POS 45
@@ -175,9 +176,8 @@ int usb_dc_attach(void)
 	/* Enable the clock in PM */
 	PM->APBBMASK.bit.USB_ = 1;
 
-	/* Enable the GCLK */
-	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_ID_USB | GCLK_CLKCTRL_GEN_GCLK0 |
-			    GCLK_CLKCTRL_CLKEN;
+	clock_control_on(device_get_binding(DT_USB_DC_SAM0_CLOCK_CONTROLLER),
+			SOC_ATMEL_SAM0_GCLK_SUBSYS(GCLK_CLKCTRL_ID_USB_Val));
 
 	while (GCLK->STATUS.bit.SYNCBUSY) {
 	}

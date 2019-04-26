@@ -1,0 +1,37 @@
+#
+# Copyright (c) 2019 Derek Hageman <hageman@inthat.cloud>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+title: Atmel SAM0 clock source
+version: 0.1
+
+description: >
+    This is a representation of a clock source for Atmel SAM0 devices
+
+properties:
+    compatible:
+      type: string
+      category: required
+      description: compatible strings
+      constraint: "atmel,sam0-clock"
+
+    label:
+      type: string
+      category: required
+      description: Human readable string describing the device (used by Zephyr for API name)
+      generation: define
+
+    clocks:
+      type: array
+      category: optional
+      description: input clock source
+      generation: define
+
+    clock-frequency:
+      type: int
+      description: output clock frequency (Hz)
+      generation: define
+      category: required
+...

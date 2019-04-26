@@ -13,13 +13,15 @@ LOG_MODULE_REGISTER(spi_sam0);
 #include <device.h>
 #include <spi.h>
 #include <soc.h>
+#include <clock_control.h>
 
 /* Device constant configuration parameters */
 struct spi_sam0_config {
 	SercomSpi *regs;
 	u32_t pads;
 	u32_t pm_apbcmask;
-	u16_t gclk_clkctrl_id;
+	const char *gclk_src;
+	u16_t gclk_id;
 };
 
 /* Device run time data */
@@ -50,6 +52,7 @@ static int spi_sam0_configure(struct device *dev,
 	SercomSpi *regs = cfg->regs;
 	SERCOM_SPI_CTRLA_Type ctrla = {.reg = 0};
 	SERCOM_SPI_CTRLB_Type ctrlb = {.reg = 0};
+	u32_t gclk_freq;
 	int div;
 
 	if (spi_context_configured(&data->ctx, config)) {
@@ -93,8 +96,12 @@ static int spi_sam0_configure(struct device *dev,
 	/* 8 bits per transfer */
 	ctrlb.bit.CHSIZE = 0;
 
+	clock_control_get_rate(device_get_binding(cfg->gclk_src),
+			       SOC_ATMEL_SAM0_GCLK_SUBSYS(cfg->gclk_id),
+			       &gclk_freq);
+
 	/* Use the requested or next higest possible frequency */
-	div = (SOC_ATMEL_SAM0_GCLK0_FREQ_HZ / config->frequency) / 2U - 1;
+	div = (gclk_freq / config->frequency) / 2U - 1;
 	div = MAX(0, MIN(UINT8_MAX, div));
 
 	/* Update the configuration only if it has changed */
@@ -438,9 +445,8 @@ static int spi_sam0_init(struct device *dev)
 	struct spi_sam0_data *data = dev->driver_data;
 	SercomSpi *regs = cfg->regs;
 
-	/* Enable the GCLK */
-	GCLK->CLKCTRL.reg = cfg->gclk_clkctrl_id | GCLK_CLKCTRL_GEN_GCLK0 |
-			    GCLK_CLKCTRL_CLKEN;
+	clock_control_on(device_get_binding(cfg->gclk_src),
+			 SOC_ATMEL_SAM0_GCLK_SUBSYS(cfg->gclk_id));
 
 	/* Enable SERCOM clock in PM */
 	PM->APBCMASK.reg |= cfg->pm_apbcmask;
@@ -474,7 +480,8 @@ static const struct spi_driver_api spi_sam0_driver_api = {
 	static const struct spi_sam0_config spi_sam0_config_##n = {          \
 		.regs = (SercomSpi *)DT_SPI_SAM0_SERCOM##n##_BASE_ADDRESS, \
 		.pm_apbcmask = PM_APBCMASK_SERCOM##n,                        \
-		.gclk_clkctrl_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE,         \
+		.gclk_src = DT_SPI_SAM0_SERCOM##n##_CLOCK_CONTROLLER,	     \
+		.gclk_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE_Val,	     \
 		.pads = SPI_SAM0_SERCOM_PADS(n)                       \
 	}
 

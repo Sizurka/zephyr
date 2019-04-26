@@ -10,6 +10,7 @@
 #include <misc/__assert.h>
 #include <soc.h>
 #include <uart.h>
+#include <clock_control.h>
 
 /* Device constant configuration parameters */
 struct uart_sam0_dev_cfg {
@@ -17,7 +18,8 @@ struct uart_sam0_dev_cfg {
 	u32_t baudrate;
 	u32_t pads;
 	u32_t pm_apbcmask;
-	u16_t gclk_clkctrl_id;
+	const char *gclk_src;
+	u16_t gclk_id;
 #if CONFIG_UART_INTERRUPT_DRIVEN
 	void (*irq_config_func)(struct device *dev);
 #endif
@@ -76,10 +78,10 @@ static int uart_sam0_init(struct device *dev)
 	int retval;
 	const struct uart_sam0_dev_cfg *const cfg = DEV_CFG(dev);
 	SercomUsart *const usart = cfg->regs;
+	struct device *gclk = device_get_binding(cfg->gclk_src);
+	u32_t gclk_freq;
 
-	/* Enable the GCLK */
-	GCLK->CLKCTRL.reg =
-	    cfg->gclk_clkctrl_id | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_CLKEN;
+	clock_control_on(gclk, SOC_ATMEL_SAM0_GCLK_SUBSYS(cfg->gclk_id));
 
 	/* Enable SERCOM clock in PM */
 	PM->APBCMASK.reg |= cfg->pm_apbcmask;
@@ -106,8 +108,10 @@ static int uart_sam0_init(struct device *dev)
 			   SERCOM_USART_CTRLB_RXEN | SERCOM_USART_CTRLB_TXEN;
 	wait_synchronization(usart);
 
-	retval = uart_sam0_set_baudrate(usart, cfg->baudrate,
-					SOC_ATMEL_SAM0_GCLK0_FREQ_HZ);
+	clock_control_get_rate(gclk, SOC_ATMEL_SAM0_GCLK_SUBSYS(cfg->gclk_id),
+			       &gclk_freq);
+
+	retval = uart_sam0_set_baudrate(usart, cfg->baudrate, gclk_freq);
 	if (retval != 0) {
 		return retval;
 	}
@@ -296,7 +300,8 @@ static const struct uart_sam0_dev_cfg uart_sam0_config_##n = {		       \
 	.regs = (SercomUsart *)DT_UART_SAM0_SERCOM##n##_BASE_ADDRESS,      \
 	.baudrate = DT_UART_SAM0_SERCOM##n##_CURRENT_SPEED,		       \
 	.pm_apbcmask = PM_APBCMASK_SERCOM##n,				       \
-	.gclk_clkctrl_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE,		       \
+	.gclk_src = DT_UART_SAM0_SERCOM##n##_CLOCK_CONTROLLER,		       \
+	.gclk_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE_Val,	       	       \
 	.pads = UART_SAM0_SERCOM_PADS(n),				       \
 	UART_SAM0_IRQ_HANDLER_FUNC(n)					       \
 }

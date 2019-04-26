@@ -37,4 +37,8 @@ config SYS_CLOCK_HW_CYCLES_PER_SEC
 	int
 	default 48000000
 
+config SYSTEM_CLOCK_INIT_PRIORITY
+	int
+	default 4
+
 endif # SOC_SERIES_SAMD20

@@ -15,6 +15,7 @@
 			interrupts = <7 0>;
 			num-bidir-endpoints = <8>;
 			label = "USB0";
+			clocks = <&gclk0>;
 		};
 	};
 };
