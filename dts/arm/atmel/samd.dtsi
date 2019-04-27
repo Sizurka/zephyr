@@ -106,6 +106,34 @@
 			#clock-cells = <0>;
 			label = "GCLK_3";
 		};
+
+		gclk4: gclk4 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_4";
+		};
+
+		gclk5: gclk5 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_5";
+		};
+
+		gclk6: gclk6 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_6";
+		};
+
+		gclk7: gclk7 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_7";
+		};
 	};
 
 	sram0: memory@20000000 {
