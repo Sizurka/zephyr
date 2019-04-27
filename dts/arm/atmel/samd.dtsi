@@ -19,6 +19,123 @@
 		};
 	};
 
+	clocks {
+		#address-cells = <0>;
+
+		osc32k: osc32k {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <32768>;
+			#clock-cells = <0>;
+			status = "disabled";
+			label = "OSC32K";
+		};
+
+		ulposc32k: ulposc32k {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <32768>;
+			#clock-cells = <0>;
+			label = "ULPOSC32K";
+		};
+
+		osc8m: osc8m {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <8000000>;
+			#clock-cells = <0>;
+			label = "OSC8M";
+		};
+
+		xosc32k: xosc32k {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <32768>;
+			#clock-cells = <0>;
+			status = "disabled";
+			label = "XOSC32K";
+		};
+
+		xosc: xosc {
+			compatible = "atmel,sam0-clock";
+			#clock-cells = <0>;
+			clock-frequency = <2000000>;
+			status = "disabled";
+			label = "XOSC";
+		};
+
+		dfll: dfll {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <48000000>;
+			clocks = <&gclk1>;
+			#clock-cells = <0>;
+			label = "DFLL";
+		};
+
+		fdpll: fdpll {
+			compatible = "atmel,sam0-clock";
+			#clock-cells = <0>;
+			label = "FDPLL";
+			status = "disabled";
+		};
+
+		gclk0: gclk0 {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <48000000>;
+			clocks = <&dfll>;
+			#clock-cells = <0>;
+			label = "GCLK_0";
+		};
+
+		gclk1: gclk1 {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <8000000>;
+			clocks = <&osc8m>;
+			#clock-cells = <0>;
+			label = "GCLK_1";
+		};
+
+		gclk2: gclk2 {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <1024>;
+			clocks = <&ulposc32k>;
+			#clock-cells = <0>;
+			label = "GCLK_2";
+		};
+
+		gclk3: gclk3 {
+			compatible = "atmel,sam0-clock";
+			clock-frequency = <8000000>;
+			clocks = <&osc8m>;
+			#clock-cells = <0>;
+			label = "GCLK_3";
+		};
+
+		gclk4: gclk4 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_4";
+		};
+
+		gclk5: gclk5 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_5";
+		};
+
+		gclk6: gclk6 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_6";
+		};
+
+		gclk7: gclk7 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_7";
+		};
+	};
+
 	sram0: memory@20000000 {
 		device_type = "memory";
 		compatible = "mmio-sram";
@@ -68,6 +185,7 @@
 			reg = <0x40001000 9>;
 			interrupts = <2 0>;
 			label = "WATCHDOG_0";
+			clocks = <&gclk2>;
 		};
 
 		sercom0: sercom@42000800 {
@@ -75,6 +193,7 @@
 			reg = <0x42000800 0x40>;
 			status = "disabled";
 			label = "SERCOM0";
+			clocks = <&gclk0>;
 		};
 
 		sercom1: sercom@42000c00 {
@@ -82,6 +201,7 @@
 			reg = <0x42000c00 0x40>;
 			status = "disabled";
 			label = "SERCOM1";
+			clocks = <&gclk0>;
 		};
 
 		sercom2: sercom@42001000 {
@@ -89,6 +209,7 @@
 			reg = <0x42001000 0x40>;
 			status = "disabled";
 			label = "SERCOM2";
+			clocks = <&gclk0>;
 		};
 
 		sercom3: sercom@42001400 {
@@ -96,6 +217,7 @@
 			reg = <0x42001400 0x40>;
 			status = "disabled";
 			label = "SERCOM3";
+			clocks = <&gclk0>;
 		};
 
 		sercom4: sercom@42001800 {
@@ -103,6 +225,7 @@
 			reg = <0x42001800 0x40>;
 			status = "disabled";
 			label = "SERCOM4";
+			clocks = <&gclk0>;
 		};
 
 		sercom5: sercom@42001c00 {
@@ -110,6 +233,7 @@
 			reg = <0x42001c00 0x40>;
 			status = "disabled";
 			label = "SERCOM5";
+			clocks = <&gclk0>;
 		};
 
 		porta: gpio@41004400 {
@@ -135,6 +259,7 @@
 			clock-generator = <0>;
 			status = "disabled";
 			label = "RTC";
+			clocks = <&gclk0>;
 		};
 	};
 };

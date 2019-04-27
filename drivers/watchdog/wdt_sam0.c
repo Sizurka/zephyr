@@ -7,6 +7,7 @@
 
 #include <soc.h>
 #include <watchdog.h>
+#include <clock_control.h>
 
 #define LOG_LEVEL CONFIG_WDT_LOG_LEVEL
 #include <logging/log.h>
@@ -33,9 +34,14 @@ static u32_t wdt_sam0_timeout_to_wdt_period(u32_t timeout_ms)
 {
 	u32_t next_pow2;
 	u32_t cycles;
+	u32_t gclk_freq;
 
-	/* Calculate number of clock cycles @ 1.024 kHz input clock */
-	cycles = (timeout_ms * 1024U) / 1000;
+	clock_control_get_rate(device_get_binding(DT_WDT_SAM0_CLOCK_CONTROLLER),
+			SOC_ATMEL_SAM0_GCLK_SUBSYS(GCLK_CLKCTRL_ID_WDT_Val),
+			&gclk_freq);
+
+	/* Calculate number of clock cycles @ input clock frequency */
+	cycles = (timeout_ms * gclk_freq) / 1000;
 
 	/* Minimum wdt period is 8 clock cycles (register value 0) */
 	if (cycles <= 8U)
@@ -203,10 +209,8 @@ static int wdt_sam0_init(struct device *dev)
 	/* Enable APB clock */
 	PM->APBAMASK.bit.WDT_ = 1;
 
-	/* Connect to GCLK2 (~1.024 kHz) */
-	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_ID_WDT
-		| GCLK_CLKCTRL_GEN_GCLK2
-		| GCLK_CLKCTRL_CLKEN;
+	clock_control_on(device_get_binding(DT_WDT_SAM0_CLOCK_CONTROLLER),
+			SOC_ATMEL_SAM0_GCLK_SUBSYS(GCLK_CLKCTRL_ID_WDT_Val));
 
 	IRQ_CONNECT(DT_WDT_SAM0_IRQ,
 		    DT_WDT_SAM0_IRQ_PRIORITY, wdt_sam0_isr,

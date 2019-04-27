@@ -1,0 +1,13 @@
+# Kconfig - Clock controller driver configuration options
+#
+# Copyright (c) 2019 Derek Hageman <hageman@inthat.cloud>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_SERIES_SAMD20 || SOC_SERIES_SAMD21
+
+config CLOCK_CONTROL_SAMD2X
+	bool
+	default y
+
+endif # SOC_SERIES_SAMD20 || SOC_SERIES_SAMD21

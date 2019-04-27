@@ -7,6 +7,15 @@
 #include <atmel/samd.dtsi>
 
 / {
+	clocks {
+		gclk8: gclk8 {
+			compatible = "atmel,sam0-clock";
+			status = "disabled";
+			#clock-cells = <0>;
+			label = "GCLK_8";
+		};
+	};
+
 	soc {
 		usb0: usb@41005000 {
 			compatible = "atmel,sam0-usb";
@@ -15,6 +24,7 @@
 			interrupts = <7 0>;
 			num-bidir-endpoints = <8>;
 			label = "USB0";
+			clocks = <&gclk0>;
 		};
 	};
 };

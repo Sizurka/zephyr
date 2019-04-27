@@ -23,9 +23,9 @@ properties:
       generation: define
       category: required
 
-    clock-generator:
-      type: int
-      description: clock generator index
-      generation: define
+    clocks:
+      type: array
+      description: clock source
       category: required
+      generation: define
 ...
