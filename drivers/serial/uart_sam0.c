@@ -10,6 +10,7 @@
 #include <misc/__assert.h>
 #include <soc.h>
 #include <uart.h>
+#include <clock_control.h>
 #include <dma.h>
 
 /* Device constant configuration parameters */
@@ -18,7 +19,7 @@ struct uart_sam0_dev_cfg {
 	u32_t baudrate;
 	u32_t pads;
 	u32_t pm_apbcmask;
-	u16_t gclk_clkctrl_id;
+	clock_control_subsys_t clk_sys;
 #if CONFIG_UART_INTERRUPT_DRIVEN || CONFIG_UART_ASYNC_API
 	void (*irq_config_func)(struct device *dev);
 #endif
@@ -372,10 +373,15 @@ static int uart_sam0_init(struct device *dev)
 	int retval;
 	const struct uart_sam0_dev_cfg *const cfg = DEV_CFG(dev);
 	SercomUsart *const usart = cfg->regs;
+	struct device *clk = device_get_clock(dev, 0);
+	u32_t clk_freq;
 
-	/* Enable the GCLK */
-	GCLK->CLKCTRL.reg =
-	    cfg->gclk_clkctrl_id | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_CLKEN;
+	if (!clk) {
+		return -EINVAL;
+	}
+
+	clock_control_on(clk, cfg->clk_sys);
+	clock_control_get_rate(clk, cfg->clk_sys, &clk_freq);
 
 	/* Enable SERCOM clock in PM */
 	PM->APBCMASK.reg |= cfg->pm_apbcmask;
@@ -402,8 +408,7 @@ static int uart_sam0_init(struct device *dev)
 			   SERCOM_USART_CTRLB_RXEN | SERCOM_USART_CTRLB_TXEN;
 	wait_synchronization(usart);
 
-	retval = uart_sam0_set_baudrate(usart, cfg->baudrate,
-					SOC_ATMEL_SAM0_GCLK0_FREQ_HZ);
+	retval = uart_sam0_set_baudrate(usart, cfg->baudrate, clk_freq);
 	if (retval != 0) {
 		return retval;
 	}
@@ -980,7 +985,7 @@ static const struct uart_sam0_dev_cfg uart_sam0_config_##n = {		       \
 	.regs = (SercomUsart *)DT_ATMEL_SAM0_UART_SERCOM_##n##_BASE_ADDRESS,   \
 	.baudrate = DT_ATMEL_SAM0_UART_SERCOM_##n##_CURRENT_SPEED,	       \
 	.pm_apbcmask = PM_APBCMASK_SERCOM##n,				       \
-	.gclk_clkctrl_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE,		       \
+	.clk_sys = (clock_control_subsys_t)SERCOM##n##_GCLK_ID_CORE,	       \
 	.pads = UART_SAM0_SERCOM_PADS(n),				       \
 	UART_SAM0_IRQ_HANDLER_FUNC(n)					       \
 	UART_SAM0_DMA_CHANNELS(n)					       \
@@ -995,6 +1000,9 @@ DEVICE_AND_API_INIT(uart_sam0_##n, DT_ATMEL_SAM0_UART_SERCOM_##n##_LABEL,      \
 		    &uart_sam0_config_##n, PRE_KERNEL_1,		       \
 		    CONFIG_KERNEL_INIT_PRIORITY_DEVICE,			       \
 		    &uart_sam0_driver_api);				       \
+DEVICE_LINK_CLOCK(uart_sam0_##n,					       \
+		  DT_ATMEL_SAM0_UART_SERCOM_##n##_CLOCK_CONTROLLER,	       \
+		  0);							       \
 UART_SAM0_IRQ_HANDLER(n)
 
 #if DT_ATMEL_SAM0_UART_SERCOM_0_BASE_ADDRESS
