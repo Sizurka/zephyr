@@ -14,13 +14,14 @@ LOG_MODULE_REGISTER(spi_sam0);
 #include <spi.h>
 #include <soc.h>
 #include <dma.h>
+#include <clock_control.h>
 
 /* Device constant configuration parameters */
 struct spi_sam0_config {
 	SercomSpi *regs;
 	u32_t pads;
 	u32_t pm_apbcmask;
-	u16_t gclk_clkctrl_id;
+	clock_control_subsys_t clk_sys;
 #ifdef CONFIG_SPI_ASYNC
 	u8_t tx_dma_request;
 	u8_t tx_dma_channel;
@@ -62,6 +63,7 @@ static int spi_sam0_configure(struct device *dev,
 	SERCOM_SPI_CTRLA_Type ctrla = {.reg = 0};
 	SERCOM_SPI_CTRLB_Type ctrlb = {.reg = 0};
 	int div;
+	u32_t clk_freq;
 
 	if (spi_context_configured(&data->ctx, config)) {
 		return 0;
@@ -104,8 +106,11 @@ static int spi_sam0_configure(struct device *dev,
 	/* 8 bits per transfer */
 	ctrlb.bit.CHSIZE = 0;
 
+	clock_control_get_rate(device_get_clock(dev, 0),
+			       cfg->clk_sys, &clk_freq);
+
 	/* Use the requested or next higest possible frequency */
-	div = (SOC_ATMEL_SAM0_GCLK0_FREQ_HZ / config->frequency) / 2U - 1;
+	div = (clk_freq / config->frequency) / 2U - 1;
 	div = MAX(0, MIN(UINT8_MAX, div));
 
 	/* Update the configuration only if it has changed */
@@ -668,10 +673,13 @@ static int spi_sam0_init(struct device *dev)
 	const struct spi_sam0_config *cfg = dev->config->config_info;
 	struct spi_sam0_data *data = dev->driver_data;
 	SercomSpi *regs = cfg->regs;
+	struct device *clk = device_get_clock(dev, 0);
 
-	/* Enable the GCLK */
-	GCLK->CLKCTRL.reg = cfg->gclk_clkctrl_id | GCLK_CLKCTRL_GEN_GCLK0 |
-			    GCLK_CLKCTRL_CLKEN;
+	if (!clk) {
+		return -EINVAL;
+	}
+
+	clock_control_on(clk, cfg->clk_sys);
 
 	/* Enable SERCOM clock in PM */
 	PM->APBCMASK.reg |= cfg->pm_apbcmask;
@@ -758,7 +766,7 @@ static const struct spi_driver_api spi_sam0_driver_api = {
 	static const struct spi_sam0_config spi_sam0_config_##n = {          \
 		.regs = (SercomSpi *)DT_ATMEL_SAM0_SPI_SERCOM_##n##_BASE_ADDRESS,\
 		.pm_apbcmask = PM_APBCMASK_SERCOM##n,                        \
-		.gclk_clkctrl_id = GCLK_CLKCTRL_ID_SERCOM##n##_CORE,         \
+		.clk_sys = (clock_control_subsys_t)SERCOM##n##_GCLK_ID_CORE, \
 		.pads = SPI_SAM0_SERCOM_PADS(n),                             \
 		SPI_SAM0_DMA_CHANNELS(n)                                     \
 	}
@@ -773,7 +781,10 @@ static const struct spi_driver_api spi_sam0_driver_api = {
 			    DT_ATMEL_SAM0_SPI_SERCOM_##n##_LABEL,            \
 			    &spi_sam0_init, &spi_sam0_dev_data_##n,          \
 			    &spi_sam0_config_##n, POST_KERNEL,               \
-			    CONFIG_SPI_INIT_PRIORITY, &spi_sam0_driver_api)
+			    CONFIG_SPI_INIT_PRIORITY, &spi_sam0_driver_api); \
+	DEVICE_LINK_CLOCK(spi_sam0_##n,					     \
+			  DT_ATMEL_SAM0_SPI_SERCOM_##n##_CLOCK_CONTROLLER,   \
+			  0)						     \
 
 #if DT_ATMEL_SAM0_SPI_SERCOM_0_BASE_ADDRESS
 SPI_SAM0_DEVICE_INIT(0);
