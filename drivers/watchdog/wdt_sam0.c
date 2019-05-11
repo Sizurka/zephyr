@@ -7,6 +7,7 @@
 
 #include <soc.h>
 #include <watchdog.h>
+#include <clock_control.h>
 
 #define LOG_LEVEL CONFIG_WDT_LOG_LEVEL
 #include <logging/log.h>
@@ -29,13 +30,19 @@ static void wdt_sam0_wait_synchronization(void)
 	}
 }
 
-static u32_t wdt_sam0_timeout_to_wdt_period(u32_t timeout_ms)
+static u32_t wdt_sam0_timeout_to_wdt_period(struct device *dev,
+					    u32_t timeout_ms)
 {
 	u32_t next_pow2;
 	u32_t cycles;
+	u32_t clk_freq;
 
-	/* Calculate number of clock cycles @ 1.024 kHz input clock */
-	cycles = (timeout_ms * 1024U) / 1000;
+	clock_control_get_rate(device_get_clock(dev, 0),
+			       (clock_control_subsys_t)WDT_GCLK_ID,
+			       &clk_freq);
+
+	/* Calculate number of clock cycles */
+	cycles = (timeout_ms * clk_freq) / 1000;
 
 	/* Minimum wdt period is 8 clock cycles (register value 0) */
 	if (cycles <= 8U)
@@ -122,7 +129,7 @@ static int wdt_sam0_install_timeout(struct device *dev,
 		return -EINVAL;
 	}
 
-	per = wdt_sam0_timeout_to_wdt_period(cfg->window.max);
+	per = wdt_sam0_timeout_to_wdt_period(dev, cfg->window.max);
 	if (per > WDT_CONFIG_PER_16K_Val) {
 		LOG_ERR("Upper limit timeout out of range");
 		goto timeout_invalid;
@@ -130,7 +137,7 @@ static int wdt_sam0_install_timeout(struct device *dev,
 
 	if (cfg->window.min) {
 		/* Window mode */
-		window = wdt_sam0_timeout_to_wdt_period(cfg->window.min);
+		window = wdt_sam0_timeout_to_wdt_period(dev, cfg->window.min);
 		if (window > WDT_CONFIG_PER_8K_Val) {
 			LOG_ERR("Lower limit timeout out of range");
 			goto timeout_invalid;
@@ -201,17 +208,22 @@ static const struct wdt_driver_api wdt_sam0_api = {
 
 static int wdt_sam0_init(struct device *dev)
 {
+	struct device *clk;
+
 #ifdef CONFIG_WDT_DISABLE_AT_BOOT
 	/* Ignore any errors */
 	wdt_sam0_disable(dev);
 #endif
+
+	clk = device_get_clock(dev, 0);
+	if (!clk) {
+		return -EINVAL;
+	}
+
 	/* Enable APB clock */
 	PM->APBAMASK.bit.WDT_ = 1;
 
-	/* Connect to GCLK2 (~1.024 kHz) */
-	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_ID_WDT
-		| GCLK_CLKCTRL_GEN_GCLK2
-		| GCLK_CLKCTRL_CLKEN;
+	clock_control_on(clk, (clock_control_subsys_t)WDT_GCLK_ID);
 
 	IRQ_CONNECT(DT_ATMEL_SAM0_WATCHDOG_0_IRQ_0,
 		    DT_ATMEL_SAM0_WATCHDOG_0_IRQ_0_PRIORITY, wdt_sam0_isr,
@@ -226,3 +238,4 @@ static struct wdt_sam0_dev_data wdt_sam0_data;
 DEVICE_AND_API_INIT(wdt_sam0, DT_ATMEL_SAM0_WATCHDOG_0_LABEL, wdt_sam0_init,
 		    &wdt_sam0_data, NULL, PRE_KERNEL_1,
 		    CONFIG_KERNEL_INIT_PRIORITY_DEVICE, &wdt_sam0_api);
+DEVICE_LINK_CLOCK(wdt_sam0, DT_ATMEL_SAM0_WATCHDOG_0_CLOCK_CONTROLLER, 0);
