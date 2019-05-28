@@ -35,4 +35,16 @@ properties:
     category: required
     description: Human readable string describing the device (used by Zephyr for API name)
     generation: define
+
+  clock-frequency:
+    type: int
+    category: required
+    description: Timer clock frequency (Hz)
+    generation: define
+
+  clocks:
+    type: array
+    category: required
+    description: Clock gate information
+    generation: define
 ...
